@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>ああっす</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="画像加工Webアプリ">
+    <meta name="author" content="うをのめ">
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body {
+        padding-top: 60px;
+        background-color: white;
+      }
+      h1 {
+        margin-top: 30pt;
+        margin-bottom: 30pt;
+      }
+    </style>
+    <link href="css/bootstrap-responsive.min.css" rel="stylesheet">
+    <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div id="dropZone" style="
+border: 2px dashed #bbb;
+width: 500px;
+height: 500px;
+text-align: center;
+-moz-border-radius: 30px;
+-webkit-border-radius: 30px;
+border-radius: 30px;
+margin-bottom: 25px;
+vertical-align: middle;
+      ">
+        <span id="dropLabel" style="line-height: 500px">ここに画像をドロップ</span>
+        <img id="imageBox" width="500" height="500">
+      </div>
+      <p>
+        <textarea style="width: 500px" rows="3" id="textBox">嘘つきは、ツイッタラーの
+始まりです。</textarea>
+      </p>
+      <h1>これはなに？</h1>
+      <p>
+        ぼくもアースなんちゃらの画像加工アプリ大喜利やりたいなぁ。<br>
+        &nbsp;&nbsp;↓<br>
+        でもネタだけのためにアプリをインストールするの嫌だなぁ。<br>
+        &nbsp;&nbsp;↓<br>
+        自分でWebアプリ作ればよくね？<br>
+        &nbsp;&nbsp;↓<br>
+        わーい、それっぽいものになったよー！<br>
+        &nbsp;&nbsp;↓<br>
+        っていうか、フォトショ使えばよくね？&nbsp;&nbsp;← いまここ<br>
+      </p>
+      <h1>どうやって使うの？</h1>
+      <ol>
+        <li>「ここに画像をドロップ」にデスクトップなどに置いた画像ファイルをドラッグ＆ドロップ。</li>
+        <li>(ネタ)画像ができあがるので右クリックからの「名前を付けて画像を保存」。</li>
+        <li>ついぴくなどのサイトに張り付けて大喜利に参加する。</li>
+        <li>お好みに応じてテキストボックスに自作のポエムを書き込みましょう。
+            また、画像クリックでテキスト位置をなんとなく変更できます。</li>
+      </ol>
+      <p>
+        Firefox 24.0 @ Windows 7 で動作確認しています。
+      </p>
+      <p>
+        作者は本アプリの利用によって生じるいかなる問題 (クソなブラウザがフリーズした、
+        ツイッターでスベって精神的苦痛を受けた、などなど) にも一切責任を負いません。
+        でも何かあれば <a href="http://twitter.com/uwnm">@uwnm</a> まで。
+      </p>
+      <h1>よくある愚問</h1>
+      <ul>
+        <li><dl>
+          <dt>Q. あのロゴが見当たらないんだけど。</dt>
+          <dd>A. やだなぁ、あのロゴをパクッたら怒られちゃうじゃないですかぁ～。</dd>
+        </dl></li>
+        <li><dl>
+          <dt>Q. えっ、気の利いた口当たりのいいポエムを添えてくれるんじゃないの？</dt>
+          <dd>A. ポエムは自己責任でお願いしますね。</dd>
+        </dl></li>
+        <li><dl>
+          <dt>Q. もっと細かな画像操作がしたい。文字の大きさと色も変えたい。</dt>
+          <dd>A. あっマジレスするとフォトショをお買い求められることをお勧めしますよ。</dd>
+        </dl></li>
+      </ul>
+    </div>
+    <canvas id="imageCanvas" width="500" height="500" style="display: none"></canvas>
+    <script src="js/jquery-1.10.2.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/pixastic.core.js"></script>
+    <script src="js/actions/glow.js"></script>
+    <script src="js/actions/hsl.js"></script>
+    <script src="js/actions/resize.js"></script>
+    <script type="text/javascript">
+jQuery(function($){
+
+  var file = null;
+  var cv = $("#imageCanvas")[0];
+  var cx = cv.getContext("2d");
+  var originalImage = new Image();
+  var processedImage = null;
+  var px = 0.5;
+  var py = 0.95;
+
+  $("#dropZone").bind("dragover", function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    e.dataTransfer = e.originalEvent.dataTransfer;
+    e.dataTransfer.dropEffect = "copy";
+  });
+
+  $("#dropZone").bind("drop", function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    e.dataTransfer = e.originalEvent.dataTransfer;
+    if (e.dataTransfer.files.length == 0) return;
+    var f = e.dataTransfer.files[0];
+    if (!f.type.match("image.*")) return;
+    file = f;
+    doLoadImage();
+  });
+
+  $("#dropZone").click(function(e) {
+    var r = e.target.getBoundingClientRect();
+    px = (e.clientX - r.left) / r.width;
+    py = (e.clientY - r.top) / r.height;
+    doDrawImage();
+  });
+
+  function doLoadImage() {
+    if (file == null) return;
+    var reader = new FileReader();
+    reader.onload = function() {
+      originalImage.src = "";
+      originalImage.src = reader.result;
+    }
+    reader.readAsDataURL(file);
+  }
+
+  originalImage.onload = function() {
+    var img = originalImage;
+    try {
+      // Resize the image to fit in the canvas.
+      var cw = cv.width * 1.0;;
+      var ch = cv.height * 1.0;
+      var iw = img.width * 1.0;
+      var ih = img.height * 1.0;
+      if (iw > cw || ih > ch) {
+        if (iw / cw > ih / ch) {
+          img = Pixastic.process(img, "resize", {
+                                  width: cw,
+                                  height: ih * cw / iw
+                                });
+        } else {
+          img = Pixastic.process(img, "resize", {
+                                  width: iw * ch / ih,
+                                  height: ch
+                                });
+        }
+      }
+      // Apply some filters.
+      img = Pixastic.process(img, "hsl", {
+                              hue: 20,
+                              saturation: -15,
+                              lightness: 5
+                            });
+      img = Pixastic.process(img, "glow", {
+                              amount: 0.3,
+                              radius: 0.2
+                            });
+      // Okay, now we can go on.
+      processedImage = img;
+      doDrawImage();
+    } catch (e) {
+      // Pixastic sometimes causes NS_ERROR_NOT_AVAILABLE in Firefox 24.0.
+      processedImage = null;
+      $("#dropLabel").text("失敗しちゃった。もう一度画像をドロップ！");
+      $("#dropZone").css("border-color", "#bbb");
+      $("#imageBox")[0].src = "";
+      throw e;
+    }
+  }
+
+  function doDrawImage() {
+    if (processedImage == null) return;
+    var img = processedImage;
+    var cw = cv.width * 1.0;;
+    var ch = cv.height * 1.0;
+    var iw = img.width * 1.0;
+    var ih = img.height * 1.0;
+    var rsize = 30.0;
+    var text = $("#textBox")[0].value.split("\n");
+    // Clear the background.
+    cx.fillStyle = "rgb(255, 255, 255)";
+    cx.fillRect(0, 0, cw, ch);
+    // Draw the image with a round corner clipping.
+    cx.save();
+console.log(iw + " " + ih);
+      var dx, dy, dw, dh;
+      if (iw / cw > ih / ch) {
+        dx = 0.0;
+        dw = cw;
+        dh = ih * cw / iw;
+        dy = (ch - dh) * 0.5;
+      } else {
+        dy = 0.0;
+        dh = ch;
+        dw = iw * ch / ih;
+        dx = (cw - dw) * 0.5;
+      }
+      cx.beginPath();
+      cx.moveTo(dx + rsize, dy);
+      cx.arcTo(dx + dw, dy, dx + dw, dy + rsize, rsize);
+      cx.arcTo(dx + dw, dy + dh, dx + dw - rsize, dy + dh, rsize);
+      cx.arcTo(dx, dy + dh, dx, dy + dh - rsize, rsize);
+      cx.arcTo(dx, dy, dx + rsize, dy, rsize);
+      cx.closePath();
+      cx.clip();
+      cx.drawImage(img, dx, dy, dw, dh);
+    cx.restore();
+    // Draw the text.
+    cx.font = "35px Arial";
+    cx.textAlign = "left";
+    cx.textBaseline = "ideographic";
+    var lineheight = 35 * 1.5;
+    var charwidth = 1.5;
+    var baselineskip = 0.8;
+    var tw = 0;
+    var th = 0;
+    for (var i = 0; i < text.length; i++) {
+      var w = cx.measureText(text[i]).width;
+      if (tw < w) {
+        tw = w;
+      }
+      th += lineheight;
+    }
+    var tx = (cw - tw) * px;
+    var ty = (ch - th) * py;
+//  cx.fillStyle = "rgba(255, 255, 255, 0.3)";
+//  cx.fillRect(tx, ty, tw, th);
+    cx.fillStyle = "rgba(80, 170, 240, 0.9)";
+    for (var i = 0; i < text.length; i++) {
+      cx.fillText(text[i], tx, ty + (i + baselineskip) * lineheight);
+    }
+    // Show the image.
+    $("#dropLabel").text("");
+    $("#dropZone").css("border-color", "white");
+    $("#imageBox")[0].src = cv.toDataURL("image/jpeg");
+  };
+
+});
+    </script>
+</body></html>
