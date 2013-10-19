@@ -197,7 +197,6 @@ jQuery(function($){
     cx.fillRect(0, 0, cw, ch);
     // Draw the image with a round corner clipping.
     cx.save();
-console.log(iw + " " + ih);
       var dx, dy, dw, dh;
       if (iw / cw > ih / ch) {
         dx = 0.0;
@@ -225,7 +224,7 @@ console.log(iw + " " + ih);
     cx.textAlign = "left";
     cx.textBaseline = "ideographic";
     var lineheight = 35 * 1.5;
-    var charwidth = 1.5;
+//  var charwidth = 1.5;
     var baselineskip = 0.8;
     var tw = 0;
     var th = 0;
